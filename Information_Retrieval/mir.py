@@ -37,7 +37,9 @@ from sklearn.metrics import *
 from sklearn.feature_extraction.text import TfidfVectorizer
 class IR:
     def __init__(self,source_path):
-        self.source_path
+        self.source_path = source_path
+        self.address_resolver = lambda add : self.source_path + add
+        
     
     def classification(self,text):
         #text class
