@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="./Index.css">
+    <title>Search Type</title>
+    <script type="text/javascript" src="./index.js"></script> 
+</head>
+<body>
+
+<h1>Custom Select <span>Without Plugin</span></h1>
+
+<select name="engine" id="engine">
+    <option value="hide">--engine--</option>
+    <option value="elasticsearch">Elasticsearch</option>
+    <option value="mir">MIR</option>
+</select> 
+
+<select name="type" id="type">
+    <option value="hide">--type--</option>
+    <option value="boolean">Boolean</option>
+    <option value="tf-idf">tf-idf</option>
+    <option value="transformer">transformer</option>
+</select>
+
+<select name="attribute" id="attribute">
+    <option value="hide">--attribute--</option>
+    <option value="id">id</option>
+    <option value="title">title</option>
+    <option value="abstract">abstract</option>
+    <option value="author">author</option>
+</select>
+
+<button onclick="onSadeghClicked()">Sadegh</button>
+
+</body>
+
+</html>
