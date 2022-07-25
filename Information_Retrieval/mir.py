@@ -297,10 +297,11 @@ class IR:
         # self.boolean_ir.pre_process_title()
         # print("loading tf-idf search model")
         # self.tf_idf_raw = TF_IDF_IR(self.main_data)
-        print("loading fasttext module")
-        self.fast_text = Fast_text_TF_IDF_IR(self.main_data,t = "lemma")
-        print("process fasttext module")
-        self.fast_text.preprocess(pre = True ,dim=400, epoch=20 , lr = 0.06 , ws = 10 )
+        # print("loading fasttext module")
+        # self.fast_text = Fast_text_TF_IDF_IR(self.main_data,t = "lemma")
+        # print("process fasttext module")
+        # self.fast_text.preprocess(pre = True ,dim=400, epoch=20 , lr = 0.06 , ws = 10 )
+        print("Transformers loading")
         self.transformer = Transformer(self.main_data,"all-MiniLM-L12-v2")
 
 
