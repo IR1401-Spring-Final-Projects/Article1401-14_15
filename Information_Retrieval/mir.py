@@ -6,6 +6,7 @@ import nltk
 from nltk.tokenize import word_tokenize
 from collections import defaultdict
 from typing import List,Tuple
+import pickle
 import spacy
 from collections import defaultdict
 from gensim.models import KeyedVectors
@@ -35,10 +36,13 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.manifold import TSNE
 from sklearn.metrics import *
 from sklearn.feature_extraction.text import TfidfVectorizer
+from scipy import sparse
+import networkx as nx
 
 # nltk.download()
 # python3 -m spacy download en_core_web_sm
 # pip install -U sentence-transformers
+
 source_path = "./"
 def address_resolver(add):
     return source_path + add
@@ -144,10 +148,11 @@ class TF_IDF_IR:
         self.idf_title =  {int(key) : float(self.idf_title[key]) for key in self.idf_title}
 
     def process_q(self,q : List , tf , idf , k) -> List[Tuple]:
-        return sorted([(key,sum([tf[key].get(wq,0) * idf.get(wq,0) for wq in q])) for key in tf], key = lambda x : x[1] , reverse=True)[:k]
+        without_expansion = sorted([(key,sum([tf[key].get(wq,0) * idf.get(wq,0) for wq in q])) for key in tf], key = lambda x : x[1] , reverse=True)[k[0]:k[1]]
+        return without_expansion
         
 
-    def query(self,type : Query_type , input_string:str , k : int = 10) -> List:
+    def query(self,type : Query_type , input_string:str , k) -> List:
         wk = self.tokenizer(input_string.strip().lower())
         if type == Query_type.TITLE:
             q = [int(self.lemma_title.get(w,0)) for w in wk]
@@ -233,23 +238,28 @@ class Fast_text_TF_IDF_IR:
         self.doc_emb = json.load(open("./fasttext/doc_embedding.json","r"))
         self.doc_emb = {key : np.array(self.doc_emb[key]).reshape(1,self.dim) for key in self.doc_emb}
 
-    def process_q(self,q : np.array) -> List[Tuple]:
+    def process_q(self,q : np.array , expansion = False) -> List[Tuple]:
+        without_expansion = sorted([(key,np.abs(distance.cosine(q,self.doc_emb[key]))) for key in self.doc_emb],key = lambda x : x[1])
+        if not expansion : 
+            return without_expansion
+        near = without_expansion[:10]
+        far = without_expansion[-10:]
+        q = 0.6 * q + 0.5 * np.mean([self.doc_emb[a[0]]for a in near],axis = 0) - 0.1 * np.mean([self.doc_emb[a[0]]for a in far], axis = 0)
         return sorted([(key,np.abs(distance.cosine(q,self.doc_emb[key]))) for key in self.doc_emb],key = lambda x : x[1])
-        
 
-    def query(self, input_string:str , k : int = 10) -> List:
+    def query(self, input_string:str , k, expansion = False) -> List:
         word = self.tokenizer(input_string.strip().lower())
         matrix = np.array([self.emmbeding[w] for w in word if self.is_c_(w)]).reshape(-1,self.dim)
         c = self.c_soft(np.array([self.idf.get(self.mapping.get(w,0),0) for w in word if self.is_c_(w)]).reshape(1,-1))
         q = np.matmul(c,matrix)[0]
-        article_id = self.process_q(q)[:k]
+        article_id = self.process_q(q , expansion)[k[0]:k[1]]
         articles = [self.documents[id[0]] for id in article_id]
         return (article_id,articles)
 
 source = "./"
 f_source = lambda s : source+"/"+s
 class Transformer:
-  def __init__(self,docs,model_name = 'all-MiniLM-L6-v2'):
+  def __init__(self,docs,model_name = './DATA/sentence-transformers_all-MiniLM-L12-v2/'):
     print(f"Transformer\ndownloading model {model_name}")
     self.model = SentenceTransformer(model_name)
     self.documents = docs
@@ -275,34 +285,99 @@ class Transformer:
     print(f"loading docs_rep")
     self.representation = json.load(open(f_source("DATA/P3/transformer.json"),"r"))
     self.representation = {key : np.array(self.representation[key]) for key in self.representation }
-  def query(self,input_str:str , k = 10):
+  def query(self,input_str:str , k , expansion = False):
     q = self.model.encode(input_str)
-    article_id = sorted([(key,np.abs(distance.cosine(q,self.representation[key]))) for key in self.representation],key = lambda x : x[1])[:k]
-    article =  [self.documents[id[0]] for id in article_id]
-    return (article_id,article)
+    without_expansion = sorted([(key,np.abs(distance.cosine(q,self.representation[key]))) for key in self.representation],key = lambda x : x[1])
+    if not expansion:
+        article_id = without_expansion[k[0]:k[1]]
+        article =  [self.documents[id[0]] for id in article_id]
+        return (article_id,article)
+    near = without_expansion[:10]
+    far = without_expansion[-10:]
+    q = 0.6 * q + 0.5 * np.mean([self.representation[a[0]]for a in near]) - 0.1 * np.mean([self.representation[a[0]]for a in far])
+    return sorted([(key,np.abs(distance.cosine(q,self.representation[key]))) for key in self.representation],key = lambda x : x[1])[k[0]:k[1]]
         
+
+class Page_Ranking_Hits:
+    def __init__(self):
+        objective = "article"
+        self.ref_matrix = None
+        self.articles = sparse.load_npz("./DATA/P5/articles_sparse.npz")
+        self.objective = self.articles if objective == "article" else self.authors
+        representation = json.load(open(f_source("DATA/P5/article_mapping.json"),"r"))
+        self.mapping = {int(representation[doc]):doc for doc in representation}
+        
+    def compute_page_rank(self, alpha = 0.9):
+        graph = nx.from_numpy_array(A=self.objective.toarray(), create_using=nx.DiGraph)
+        self.pr = nx.pagerank(G=graph, alpha=alpha)
+        
+    def compute_hits(self):
+        graph = nx.from_numpy_array(A=self.objective.toarray(), create_using=nx.DiGraph)
+        self.hub, self.authority = nx.hits(G=graph) 
+        
+    def tops_pages(self, k = 10):
+        res = sorted(self.pr.items(),key = lambda x : x[1] , reverse = True)[:k]
+        return [self.mapping[int(ar[0])] for ar in res]
+    
+    def cal_cites(self):
+        return np.asarray(np.sum(self.objective,axis = 0)).reshape(-1)
+    
+    def top_hubs(self, k = 10):
+        return sorted(self.hub.items(),key = lambda x : x[1] , reverse = True)[:k]
+    
+    def top_auth(self, k = 10):
+        return sorted(self.authority.items(),key = lambda x : x[1] , reverse = True)[:k]
+    
+    def cal_ref(self):
+        return np.asarray(np.sum(self.objective,axis = 1)).reshape(-1)
+
 MAIN_DATA_PATH = "../DATA/clean_data.json"
 CLUSTER_DATA_PATH = "../DATA/clustring_data.csv"
+
 
 class IR:
     def __init__(self):
         print("loading requirments ... ")
         print("loading main data ... ")
+
         self.main_data = json.load(open(address_resolver(MAIN_DATA_PATH),"r"))
-        # print("loading clustring data ... ")
-        # self.clustring_data = pd.read_csv(address_resolver(CLUSTER_DATA_PATH))
-        # print("loading Boolean search model")
-        # self.boolean_ir = Boolean_IR(self.main_data)
-        # self.boolean_ir.pre_process_authors()
-        # self.boolean_ir.pre_process_title()
-        # print("loading tf-idf search model")
-        # self.tf_idf_raw = TF_IDF_IR(self.main_data)
-        # print("loading fasttext module")
-        # self.fast_text = Fast_text_TF_IDF_IR(self.main_data,t = "lemma")
-        # print("process fasttext module")
-        # self.fast_text.preprocess(pre = True ,dim=400, epoch=20 , lr = 0.06 , ws = 10 )
+
+        print("loading clustring data ... ")
+        self.clustring_data = pd.read_csv(address_resolver(CLUSTER_DATA_PATH))
+        self.cluster_labels_map = {0:"cs.LG" , 1:"cs.CV" , 2:"cs.AI" , 3:"cs.RO" , 4:"cs.CL"}
+        self.kmeas_map_label = {0: 2, 1: 2, 2: 1, 3: 3, 4: 2, 5: 1, 6: 1, 7: 4, 8: 1, 9: 1, 10: 1, 11: 1}
+        self.cluster_model = pickle.load(open("DATA/P4/finalized_cluster_model.sav", 'rb'))
+        print("cluster_model = ",self.cluster_model)
+
+        print("loading Boolean search model")
+        self.boolean_ir = Boolean_IR(self.main_data)
+        self.boolean_ir.pre_process_authors()
+        self.boolean_ir.pre_process_title()
+
+        print("loading tf-idf search model")
+        self.tf_idf_raw = TF_IDF_IR(self.main_data)
+
+        print("loading fasttext module")
+        self.fast_text = Fast_text_TF_IDF_IR(self.main_data,t = "lemma")
+        print("process fasttext module")
+        self.fast_text.preprocess(pre = True ,dim=400, epoch=20 , lr = 0.06 , ws = 10 )
+
         print("Transformers loading")
-        self.transformer = Transformer(self.main_data,"all-MiniLM-L12-v2")
+        self.transformer = Transformer(self.main_data,'./DATA/sentence-transformers_all-MiniLM-L12-v2/')
+        self.transformer.preprocess(pre_use = True)
+        self.bert_model = self.transformer.model
+
+        print("page_ranking_algorithm loading")
+        self.page_hits_articles = Page_Ranking_Hits()
+        self.page_hits_articles.compute_page_rank(0.9)
+        self.page_hits_articles.compute_hits()
+
+        ######------------ for hossein
+
+
+        print("Finished loading packages.")
+
+
 
 
         
@@ -311,27 +386,46 @@ class IR:
         #text class
         pass
     
-    def clustring(self,text):#GMM
+
+
+    def clustring(self,text):
+        # abstract_bert = bert_model.encode(data_abstract,device = "cuda")
+        # titles_bert = bert_model.encode(data_title,device = "cuda")
+        #concated_data_bert = np.array([np.array([abstract_bert[i],titles_bert[i]]).reshape(-1) for i in range((abstract_bert.shape[0]))])
         # text
         # class
-        
-        pass
+        abstract_bert = self.bert_model.encode([text])
+        titles_bert = self.bert_model.encode(["title"])
+        concated_data_bert = np.array([np.array([abstract_bert[i],titles_bert[i]]).reshape(-1) for i in range((abstract_bert.shape[0]))])
+        return self.cluster_labels_map[self.kmeas_map_label[self.cluster_model.predict(concated_data_bert)[0]]]
+
     
-    def search(self,text,type_text,query_expansion = False,mode = "bert" , range_q = (0,10)):# abstract title author
+    def search(self,text,type_text,query_expansion = False,mode = "bert" , range_q = (0,40)):# abstract title author
         #mode = bert , tf-idf , fasttext , boolean
         #text_type = abstract , title , author
         # range_q = (start , end)
-        pass
+        if mode == "bert":
+            return self.transformer.query(text,k = range_q , expansion=query_expansion)
+        elif mode == "fasttext":
+            return self.fast_text.query(text,range_q,query_expansion)
+        elif mode == "tf_idf":
+            qt = Query_type.ABSTRACT
+            if type_text == "title":
+                qt = Query_type.TITLE
+            return self.tf_idf_raw.query(qt, text , range_q)
+        elif mode == "boolean":
+            qt = Query_type.TITLE
+            if type_text == "author":
+                qt = Query_type.AUTHOR
+            return self.boolean_ir.query(qt,text,range_q)
     
-    def best_articles(self,type_query = "page_rank",mode = "article",k = 10):# page_rank,hits
+    def best_articles(self,k = 10):# page_rank,hits
+        return self.page_hits_articles.tops_pages(k = 10)
+        #self.page_hits_articles.
+        
         # type_query = page_rank , hits ,
         # k = numbers
-        # mode = artcile , author
+        # mode = artcile , author 
 
         pass
-
-
-
 # ir = IR()
-
-
