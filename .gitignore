@@ -109,4 +109,4 @@ media/
 *.pid
 
 .idea/
-public/
+public/Information_Retrieval/DATA/sentence-transformers_all-MiniLM-L12-v2/
