@@ -38,7 +38,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 # nltk.download()
 # python3 -m spacy download en_core_web_sm
-
+# pip install -U sentence-transformers
 source_path = "./"
 def address_resolver(add):
     return source_path + add
@@ -206,6 +206,12 @@ class Fast_text_TF_IDF_IR:
         if not pre:
             print("training fasttext module")
             os.system("rm ./fasttext/word_embedding.*")
+            print("\n making fastext")
+            os.chdir('./fasttext/fastText')
+            os.system("make")
+            os.chdir('../..')
+            print(os.getcwd())
+            print("./fasttext/fastText/fasttext module")
             os.system(f"./fasttext/fastText/fasttext skipgram -dim {dim} -ws {ws} -epoch {epoch} -lr {lr} -input {self.train_data_path} -output ./fasttext/word_embedding")
             os.system("rm ./fasttext/word_embedding.bin")
             self.emmbeding = KeyedVectors.load_word2vec_format("./fasttext/word_embedding.vec")
@@ -240,6 +246,40 @@ class Fast_text_TF_IDF_IR:
         articles = [self.documents[id[0]] for id in article_id]
         return (article_id,articles)
 
+source = "./"
+f_source = lambda s : source+"/"+s
+class Transformer:
+  def __init__(self,docs,model_name = 'all-MiniLM-L6-v2'):
+    print(f"Transformer\ndownloading model {model_name}")
+    self.model = SentenceTransformer(model_name)
+    self.documents = docs
+    self.representation = None
+  
+  def preprocess(self,pre_use = False):
+    if not pre_use:
+      docs = []
+      keys = []
+      print(f"creating representation for docs")
+      for key in self.documents:
+        abstract = self.documents[key]["abstract"]
+        if type(abstract) == str:
+          docs.append(abstract)
+          keys.append(key)
+      embeddings = self.model.encode(docs)
+      self.representation = {}
+      for key, embedding in zip(keys, embeddings):
+        self.representation[key] = embedding.tolist()
+      addr = f_source("DATA/P3/transformer.json")
+      print(f"saving docs_rep in {addr}")
+      open(addr,"w").write(json.dumps(self.representation))
+    print(f"loading docs_rep")
+    self.representation = json.load(open(f_source("DATA/P3/transformer.json"),"r"))
+    self.representation = {key : np.array(self.representation[key]) for key in self.representation }
+  def query(self,input_str:str , k = 10):
+    q = self.model.encode(input_str)
+    article_id = sorted([(key,np.abs(distance.cosine(q,self.representation[key]))) for key in self.representation],key = lambda x : x[1])[:k]
+    article =  [self.documents[id[0]] for id in article_id]
+    return (article_id,article)
         
 MAIN_DATA_PATH = "../DATA/clean_data.json"
 CLUSTER_DATA_PATH = "../DATA/clustring_data.csv"
@@ -249,18 +289,19 @@ class IR:
         print("loading requirments ... ")
         print("loading main data ... ")
         self.main_data = json.load(open(address_resolver(MAIN_DATA_PATH),"r"))
-        print("loading clustring data ... ")
-        self.clustring_data = pd.read_csv(address_resolver(CLUSTER_DATA_PATH))
-        print("loading Boolean search model")
-        self.boolean_ir = Boolean_IR(self.main_data)
-        self.boolean_ir.pre_process_authors()
-        self.boolean_ir.pre_process_title()
-        print("loading tf-idf search model")
-        self.tf_idf_raw = TF_IDF_IR(self.main_data)
+        # print("loading clustring data ... ")
+        # self.clustring_data = pd.read_csv(address_resolver(CLUSTER_DATA_PATH))
+        # print("loading Boolean search model")
+        # self.boolean_ir = Boolean_IR(self.main_data)
+        # self.boolean_ir.pre_process_authors()
+        # self.boolean_ir.pre_process_title()
+        # print("loading tf-idf search model")
+        # self.tf_idf_raw = TF_IDF_IR(self.main_data)
         print("loading fasttext module")
         self.fast_text = Fast_text_TF_IDF_IR(self.main_data,t = "lemma")
         print("process fasttext module")
-        self.fast_text.preprocess(pre = False ,dim=400, epoch=20 , lr = 0.06 , ws = 10 )
+        self.fast_text.preprocess(pre = True ,dim=400, epoch=20 , lr = 0.06 , ws = 10 )
+        self.transformer = Transformer(self.main_data,"all-MiniLM-L12-v2")
 
 
         
