@@ -61,6 +61,7 @@ class IR:
         # type_query = page_rank , hits ,
         # k = numbers
         # mode = artcile , author
+        
         pass
     
         
