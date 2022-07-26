@@ -66,8 +66,10 @@ function onClassificationClicked() {
 
     var xmlHttp = new XMLHttpRequest();
     xmlHttp.onreadystatechange = function() { 
-        if (xmlHttp.readyState == 4 && xmlHttp.status == 200)
-            console.log('class');
+        if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
+            resp = JSON.parse(xmlHttp.responseText)
+            document.getElementById('cls-result').innerHTML = `class: ${resp.class}`;
+        }
     }
     xmlHttp.open("POST", url, true);
     xmlHttp.send(data);
@@ -85,8 +87,10 @@ function onClusteringClicked() {
 
     var xmlHttp = new XMLHttpRequest();
     xmlHttp.onreadystatechange = function() { 
-        if (xmlHttp.readyState == 4 && xmlHttp.status == 200)
-            console.log('cluster');
+        if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
+            resp = JSON.parse(xmlHttp.responseText)
+            document.getElementById('cls-result').innerHTML = `cluster: ${resp.cluster}`;
+        }
     }
     xmlHttp.open("POST", url, true);
     xmlHttp.send(data);
@@ -96,4 +100,30 @@ function onClusteringClicked() {
 
 function showResponseData(response) {
     console.log(response);
+
+    resp = JSON.parse(response);
+
+    table = document.getElementById('search-result');
+
+    for (let result of resp) {
+        var tr = document.createElement('tr');
+
+        var td1 = document.createElement('td');
+        var td2 = document.createElement('td');
+        var td3 = document.createElement('td');
+
+        var text1 = document.createTextNode(result.id);
+        var text2 = document.createTextNode(result.scorce ? result.scorce : '');
+        var text3 = document.createTextNode(result.title);
+
+        td1.appendChild(text1);
+        td2.appendChild(text2);
+        td3.appendChild(text3);
+        tr.appendChild(td1);
+        tr.appendChild(td2);
+        tr.appendChild(td3);
+
+        table.appendChild(tr);
+    }
+
 }

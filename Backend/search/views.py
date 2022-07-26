@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 
@@ -6,6 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from elasticsearch import Elasticsearch
 
 path = os.getcwd()
+data_path = path[:path.rfind('/') + 1]
 path = path[:path.rfind('/') + 1]
 path += 'Information_Retrieval/'
 sys.path.insert(1, path)
@@ -13,6 +15,9 @@ import mir
 
 ir = mir.IR()
 client = Elasticsearch(hosts="http://127.0.0.1:9200")
+
+with open(data_path + 'DATA/clean_data.json') as f:
+    articles = json.load(f)
 
 
 @csrf_exempt
@@ -43,7 +48,14 @@ def search(request):
             })
     else:
         response_data = ir.search(expression, search_by, expand, search_type, (0, 10))
-        print(response_data)
+        response_data = list(map(lambda x: articles[x], response_data))
+        for data in response_data:
+            data['id'] = data['paperId']
+            data.pop('paperId')
+            data.pop('fieldsOfStudy')
+            data.pop('referenceCount')
+            data.pop('citationCount')
+            data.pop('references')
 
     return JsonResponse(data=response_data, safe=False)
 
