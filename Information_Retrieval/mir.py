@@ -116,12 +116,12 @@ class Boolean_IR:
     def query(self,type : Query_type , input_string:str , k) -> Tuple[List,List]:
         input_string = input_string.lower()
         if type == Query_type.TITLE:
-            mapping = self.title_ir(self.title_tokenizer(input_string.strip().lower()), k)[k[0]:k[1]]
-            return mapping
+            mapping = self.title_ir(self.title_tokenizer(input_string.strip().lower()), k)
+            return [i[0] for i in mapping]
         elif type == Query_type.AUTHOR:
             names =  self.author_ir(self.word_tokenize_author(input_string.strip()),k)
-            articles = flatten([[self.documents[id]["paperId"] for id in self.author_to_doc[self.author_to_id[name[0]]]] for name in names])[k[0]:k[1]]
-            return (articles,names)
+            articles = flatten([[self.documents[id]["paperId"] for id in self.author_to_doc[self.author_to_id[name[0]]]] for name in names])
+            return articles[k[0]:k[1]]
 
 
 
@@ -162,7 +162,7 @@ class TF_IDF_IR:
         elif type == Query_type.ABSTRACT:
             q = [int(self.lemma_abs.get(w,0)) for w in wk]
             result = self.process_q(q,self.tf_abs,self.idf_abs , k)
-        return result
+        return [i[0] for i in result]
 
 
 
@@ -254,7 +254,7 @@ class Fast_text_TF_IDF_IR:
         c = self.c_soft(np.array([self.idf.get(self.mapping.get(w,0),0) for w in word if self.is_c_(w)]).reshape(1,-1))
         q = np.matmul(c,matrix)[0]
         article_id = self.process_q(q , expansion)[k[0]:k[1]]
-        return article_id
+        return [i[0] for i in article_id]
 
 source = "./"
 f_source = lambda s : source+"/"+s
@@ -289,13 +289,14 @@ class Transformer:
     q = self.model.encode(input_str)
     without_expansion = sorted([(key,np.abs(distance.cosine(q,self.representation[key]))) for key in self.representation],key = lambda x : x[1])
     if not expansion:
-        article_id = without_expansion[k[0]:k[1]]
-        article =  [self.documents[id[0]] for id in article_id]
-        return (article_id,article)
-    near = without_expansion[:10]
-    far = without_expansion[-10:]
-    q = 0.6 * q + 0.5 * np.mean([self.representation[a[0]]for a in near],axis = 0) - 0.1 * np.mean([self.representation[a[0]]for a in far],axis = 0)
-    return sorted([(key,np.abs(distance.cosine(q,self.representation[key]))) for key in self.representation],key = lambda x : x[1])[k[0]:k[1]]
+        article_id = [i[0] for i in without_expansion[k[0]:k[1]]]
+        return article_id
+    else:
+        near = without_expansion[:10]
+        far = without_expansion[-10:]
+        q = 0.6 * q + 0.5 * np.mean([self.representation[a[0]]for a in near],axis = 0) - 0.1 * np.mean([self.representation[a[0]]for a in far],axis = 0)
+        article_id = sorted([(key,np.abs(distance.cosine(q,self.representation[key]))) for key in self.representation],key = lambda x : x[1])[k[0]:k[1]]
+        return [i[0] for i in article_id]
 
 
 class Page_Ranking_Hits:
@@ -432,7 +433,7 @@ class IR:
 
     def best_articles(self,k = 10):# page_rank,hits
         return self.page_hits_articles.tops_pages(k = 10)
-        #self.page_hits_articles.s
         # type_query = page_rank , hits ,
         # k = numbers
         # mode = artcile , author
+# ir = IR()
