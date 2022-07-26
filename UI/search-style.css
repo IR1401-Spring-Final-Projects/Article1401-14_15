@@ -63,3 +63,15 @@ body {
     text-align: center;
     margin-top: 150px;
 }
+
+.expansion-checkbox {
+    float: center;
+    border: 2px solid black;
+    border-radius: 5px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 150px;
+    margin-left: 45.5%;
+    margin-right: 45.5%;
+}

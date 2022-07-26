@@ -19,19 +19,29 @@
 <select name="type" id="type">
     <option value="hide">--type--</option>
     <option value="boolean">Boolean</option>
-    <option value="tf-idf">tf-idf</option>
-    <option value="transformer">transformer</option>
+    <option value="tf_idf">Tf-Idf</option>
+    <option value="fasttext">Fasttext</option>
+    <option value="bert">Bert</option>
 </select>
 
 <select name="attribute" id="attribute">
     <option value="hide">--attribute--</option>
-    <option value="id">id</option>
     <option value="title">title</option>
     <option value="abstract">abstract</option>
     <option value="author">author</option>
 </select>
 
 <button onclick="onSadeghClicked()">Sadegh</button>
+
+<br>
+
+<div class="input-class-cluster-container">
+    <input id="class-cluster-txt" type="text" name="" placeholder="Type your text here">
+    <div class="input-class-cluster-container">
+        <button onclick="onClassificationClicked()">Do Classification</button>
+        <button onclick="onClusteringClicked()">Do Clustering</button>
+    </div>
+</div>
 
 </body>
 

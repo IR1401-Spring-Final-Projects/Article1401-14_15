@@ -67,11 +67,11 @@ class Query_type(enum.Enum):
 class Boolean_IR:
     def __init__(self,docs):
         print("boolean search loading modules")
-        self.author_to_id = json.load(open("DATA/P3/author_to_id.json","r"))
-        self.author_to_doc = json.load(open("DATA/P3/author_to_doc.json","r"))
+        self.author_to_id = json.load(open("../Information_Retrieval/DATA/P3/author_to_id.json","r"))
+        self.author_to_doc = json.load(open("../Information_Retrieval/DATA/P3/author_to_doc.json","r"))
         self.documents = docs
-        self.lemma_title = json.load(open("DATA/P3/title_lemma.json","r"))
-        self.bool_dic_title = json.load(open("DATA/P3/bool_dic_title.json","r"))
+        self.lemma_title = json.load(open("../Information_Retrieval/DATA/P3/title_lemma.json","r"))
+        self.bool_dic_title = json.load(open("../Information_Retrieval/DATA/P3/bool_dic_title.json","r"))
         self.nlp = spacy.load("en_core_web_sm")
         self.title_tokenizer = lambda s : [token.lemma_ for token in self.nlp(s) if token.lemma_ not in self.nlp.Defaults.stop_words ]
 
@@ -132,12 +132,12 @@ class TF_IDF_IR:
 
         self.documents = docs
         print("loading tf-idf model modules")
-        self.lemma_title = json.load(open("DATA/P3/title_lemma.json","r"))
-        self.lemma_abs = json.load(open("DATA/P3/abstract_lemma.json","r"))
-        self.idf_abs = json.load(open("DATA/P3/idf_abstract.json","r"))
-        self.idf_title = json.load(open("DATA/P3/idf_title.json","r"))
-        self.tf_title = json.load(open("DATA/P3/title_tf.json","r"))
-        self.tf_abs = json.load(open("DATA/P3/asb_tf.json","r"))
+        self.lemma_title = json.load(open("../Information_Retrieval/DATA/P3/title_lemma.json","r"))
+        self.lemma_abs = json.load(open("../Information_Retrieval/DATA/P3/abstract_lemma.json","r"))
+        self.idf_abs = json.load(open("../Information_Retrieval/DATA/P3/idf_abstract.json","r"))
+        self.idf_title = json.load(open("../Information_Retrieval/DATA/P3/idf_title.json","r"))
+        self.tf_title = json.load(open("../Information_Retrieval/DATA/P3/title_tf.json","r"))
+        self.tf_abs = json.load(open("../Information_Retrieval/DATA/P3/asb_tf.json","r"))
         self.nlp = spacy.load("en_core_web_sm")
         self.tokenizer = lambda s : [token.lemma_ for token in self.nlp(s) if token.lemma_ not in self.nlp.Defaults.stop_words ]
         for key in self.tf_title:
@@ -183,14 +183,14 @@ class Fast_text_TF_IDF_IR:
         if t == "lemma":
             self.nlp = spacy.load("en_core_web_sm")
             self.tokenizer = lambda s : [token.lemma_ for token in self.nlp(s)]
-            self.train_data_path = "./fasttext/fasttext_data.txt"
-            self.mapping = json.load(open("DATA/P3/abstract_lemma.json","r"))
-            self.idf = json.load(open("DATA/P3/idf_abstract.json","r"))
+            self.train_data_path = "../Information_Retrieval/fasttext/fasttext_data.txt"
+            self.mapping = json.load(open("../Information_Retrieval/DATA/P3/abstract_lemma.json","r"))
+            self.idf = json.load(open("../Information_Retrieval/DATA/P3/idf_abstract.json","r"))
         else:
             self.tokenizer = lambda s : [token for token in word_tokenize(s)]
-            self.train_data_path = "./fasttext/fasttext_not_lemma_data.txt"
-            self.mapping = json.load(open("DATA/P3/abstract_not_lemma.json","r"))
-            self.idf = json.load(open("DATA/P3/idf_abstract_not_lemma.json","r"))
+            self.train_data_path = "../Information_Retrieval/fasttext/fasttext_not_lemma_data.txt"
+            self.mapping = json.load(open("../Information_Retrieval/DATA/P3/abstract_not_lemma.json","r"))
+            self.idf = json.load(open("../Information_Retrieval/DATA/P3/idf_abstract_not_lemma.json","r"))
         self.emmbeding = None
         self.mapping = {key : int(self.mapping[key]) for key in self.mapping}
         self.idf = {int(key) : float(self.idf[key]) for key in self.idf}
@@ -211,16 +211,16 @@ class Fast_text_TF_IDF_IR:
         self.dim = dim
         if not pre:
             print("training fasttext module")
-            os.system("rm ./fasttext/word_embedding.*")
+            os.system("rm ../Information_Retrieval/fasttext/word_embedding.*")
             print("\n making fastext")
-            os.chdir('./fasttext/fastText')
+            os.chdir('../Information_Retrieval/fasttext/fastText')
             os.system("make")
             os.chdir('../..')
             print(os.getcwd())
             print("./fasttext/fastText/fasttext module")
-            os.system(f"./fasttext/fastText/fasttext skipgram -dim {dim} -ws {ws} -epoch {epoch} -lr {lr} -input {self.train_data_path} -output ./fasttext/word_embedding")
-            os.system("rm ./fasttext/word_embedding.bin")
-            self.emmbeding = KeyedVectors.load_word2vec_format("./fasttext/word_embedding.vec")
+            os.system(f"../Information_Retrieval/fasttext/fastText/fasttext skipgram -dim {dim} -ws {ws} -epoch {epoch} -lr {lr} -input {self.train_data_path} -output ../Information_Retrieval/fasttext/word_embedding")
+            os.system("rm ../Information_Retrieval/fasttext/word_embedding.bin")
+            self.emmbeding = KeyedVectors.load_word2vec_format("../Information_Retrieval/fasttext/word_embedding.vec")
             for key in self.documents:
                 article = self.documents[key]
                 abstract = article["abstract"]
@@ -233,10 +233,10 @@ class Fast_text_TF_IDF_IR:
                         self.doc_emb[key] = np.matmul(c,matrix).tolist()[0]
                     except:
                         print(key,c)
-            open("./fasttext/doc_embedding.json","w").write(json.dumps(self.doc_emb))
+            open("../Information_Retrieval/fasttext/doc_embedding.json","w").write(json.dumps(self.doc_emb))
 
-        self.emmbeding = KeyedVectors.load_word2vec_format("./fasttext/word_embedding.vec")
-        self.doc_emb = json.load(open("./fasttext/doc_embedding.json","r"))
+        self.emmbeding = KeyedVectors.load_word2vec_format("../Information_Retrieval/fasttext/word_embedding.vec")
+        self.doc_emb = json.load(open("../Information_Retrieval/fasttext/doc_embedding.json","r"))
         self.doc_emb = {key : np.array(self.doc_emb[key]).reshape(1,self.dim) for key in self.doc_emb}
 
     def process_q(self,q : np.array , expansion = False) -> List[Tuple]:
@@ -259,7 +259,7 @@ class Fast_text_TF_IDF_IR:
 source = "./"
 f_source = lambda s : source+"/"+s
 class Transformer:
-  def __init__(self,docs,model_name = './DATA/sentence-transformers_all-MiniLM-L12-v2/'):
+  def __init__(self,docs,model_name = '../Information_Retrieval/DATA/sentence-transformers_all-MiniLM-L12-v2/'):
     print(f"Transformer\ndownloading model {model_name}")
     self.model = SentenceTransformer(model_name)
     self.documents = docs
@@ -279,11 +279,11 @@ class Transformer:
       self.representation = {}
       for key, embedding in zip(keys, embeddings):
         self.representation[key] = embedding.tolist()
-      addr = f_source("DATA/P3/transformer.json")
+      addr = f_source("../Information_Retrieval/DATA/P3/transformer.json")
       print(f"saving docs_rep in {addr}")
       open(addr,"w").write(json.dumps(self.representation))
     print(f"loading docs_rep")
-    self.representation = json.load(open(f_source("DATA/P3/transformer.json"),"r"))
+    self.representation = json.load(open(f_source("../Information_Retrieval/DATA/P3/transformer.json"),"r"))
     self.representation = {key : np.array(self.representation[key]) for key in self.representation }
   def query(self,input_str:str , k , expansion = False):
     q = self.model.encode(input_str)
@@ -302,9 +302,9 @@ class Page_Ranking_Hits:
     def __init__(self):
         objective = "article"
         self.ref_matrix = None
-        self.articles = sparse.load_npz("./DATA/P5/articles_sparse.npz")
+        self.articles = sparse.load_npz("../Information_Retrieval/DATA/P5/articles_sparse.npz")
         self.objective = self.articles if objective == "article" else self.authors
-        representation = json.load(open(f_source("DATA/P5/article_mapping.json"),"r"))
+        representation = json.load(open(f_source("../Information_Retrieval/DATA/P5/article_mapping.json"),"r"))
         self.mapping = {int(representation[doc]):doc for doc in representation}
 
     def compute_page_rank(self, alpha = 0.9):
@@ -347,7 +347,7 @@ class IR:
         self.clustring_data = pd.read_csv(address_resolver(CLUSTER_DATA_PATH))
         self.cluster_labels_map = {0:"cs.LG" , 1:"cs.CV" , 2:"cs.AI" , 3:"cs.RO" , 4:"cs.CL"}
         self.kmeas_map_label = {0: 2, 1: 2, 2: 1, 3: 3, 4: 2, 5: 1, 6: 1, 7: 4, 8: 1, 9: 1, 10: 1, 11: 1}
-        self.cluster_model = pickle.load(open("DATA/P4/finalized_cluster_model.sav", 'rb'))
+        self.cluster_model = pickle.load(open("../Information_Retrieval/DATA/P4/finalized_cluster_model.sav", 'rb'))
         print("cluster_model = ",self.cluster_model)
 
         print("loading Boolean search model")
@@ -364,7 +364,7 @@ class IR:
         self.fast_text.preprocess(pre = True ,dim=400, epoch=20 , lr = 0.06 , ws = 10 )
 
         print("Transformers loading")
-        self.transformer = Transformer(self.main_data,'./DATA/sentence-transformers_all-MiniLM-L12-v2/')
+        self.transformer = Transformer(self.main_data,'../Information_Retrieval/DATA/sentence-transformers_all-MiniLM-L12-v2/')
         self.transformer.preprocess(pre_use = True)
         self.bert_model = self.transformer.model
 
@@ -375,7 +375,7 @@ class IR:
 
         print("loading classification data ... ")
         self.classification_model_name  = 'distilbert-base-uncased'
-        self.classification_model = AutoModelForSequenceClassification.from_pretrained("DATA/P4/classification_model", from_tf=True)
+        self.classification_model = AutoModelForSequenceClassification.from_pretrained("../Information_Retrieval/DATA/P4/classification_model", from_tf=True)
         self.classification_classes = {
                         'LABEL_0' : 'cs.CV',
                         'LABEL_1' : 'cs.LG',
