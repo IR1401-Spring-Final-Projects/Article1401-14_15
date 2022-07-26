@@ -1,6 +1,7 @@
 import json
 import pandas as pd
 import numpy as np
+import tensorflow
 import enum
 import nltk
 from nltk.tokenize import word_tokenize
@@ -15,12 +16,12 @@ from sentence_transformers import SentenceTransformer
 import pandas as pd
 import sklearn
 import os
+from transformers import AutoTokenizer
 from sentence_transformers import SentenceTransformer
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.pipeline import Pipeline
 import matplotlib.pyplot as plt
-import pandas as pd
 import seaborn as sns
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import pyplot as plt
@@ -36,8 +37,10 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.manifold import TSNE
 from sklearn.metrics import *
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn import preprocessing
 from scipy import sparse
 import networkx as nx
+from transformers import AutoModelForSequenceClassification, TrainingArguments, Trainer, TextClassificationPipeline
 
 # nltk.download()
 # python3 -m spacy download en_core_web_sm
@@ -99,7 +102,7 @@ class Boolean_IR:
         print("boolean search loading title preprocess")
         for key in self.bool_dic_title:
             self.bool_dic_title[key] = np.array(self.bool_dic_title[key])
-            
+
     def title_ir(self,wk:str , k):
         words = np.array([self.lemma_title.get(w,0) for w in wk])
         titles = [(key,np.sum([np.sum([item == self.bool_dic_title[key] for item in words ])])) for key in self.documents if type(self.documents[key]["title"]) == str]
@@ -113,13 +116,12 @@ class Boolean_IR:
     def query(self,type : Query_type , input_string:str , k) -> Tuple[List,List]:
         input_string = input_string.lower()
         if type == Query_type.TITLE:
-            mapping = self.title_ir(self.title_tokenizer(input_string.strip().lower()), k)
-            articles = [self.documents[id[0]] for id in mapping]
-            return (articles,mapping)
+            mapping = self.title_ir(self.title_tokenizer(input_string.strip().lower()), k)[k[0]:k[1]]
+            return mapping
         elif type == Query_type.AUTHOR:
-            names =  self.author_ir(self.word_tokenize_authoe(input_string.strip()),k) 
-            articles = flatten([[self.documents[id] for id in self.author_to_doc[self.author_to_id[name[0]]]] for name in names])
-            return (articles[k[0]:k[1]],names)
+            names =  self.author_ir(self.word_tokenize_author(input_string.strip()),k)
+            articles = flatten([[self.documents[id]["paperId"] for id in self.author_to_doc[self.author_to_id[name[0]]]] for name in names])[k[0]:k[1]]
+            return (articles,names)
 
 
 
@@ -150,7 +152,7 @@ class TF_IDF_IR:
     def process_q(self,q : List , tf , idf , k) -> List[Tuple]:
         without_expansion = sorted([(key,sum([tf[key].get(wq,0) * idf.get(wq,0) for wq in q])) for key in tf], key = lambda x : x[1] , reverse=True)[k[0]:k[1]]
         return without_expansion
-        
+
 
     def query(self,type : Query_type , input_string:str , k) -> List:
         wk = self.tokenizer(input_string.strip().lower())
@@ -160,8 +162,7 @@ class TF_IDF_IR:
         elif type == Query_type.ABSTRACT:
             q = [int(self.lemma_abs.get(w,0)) for w in wk]
             result = self.process_q(q,self.tf_abs,self.idf_abs , k)
-        articles = [self.documents[id[0]] for id in result]
-        return (articles,result)
+        return result
 
 
 
@@ -179,7 +180,7 @@ class Fast_text_TF_IDF_IR:
         self.idf = None
         self.train_data_path = None
         print("loading fasttext requirments")
-        if t == "lemma":  
+        if t == "lemma":
             self.nlp = spacy.load("en_core_web_sm")
             self.tokenizer = lambda s : [token.lemma_ for token in self.nlp(s)]
             self.train_data_path = "./fasttext/fasttext_data.txt"
@@ -205,7 +206,7 @@ class Fast_text_TF_IDF_IR:
         except:
             return False
 
-    
+
     def preprocess(self,pre = False , ws = 5 ,epoch = 20 ,lr = 0.1, dim = 200):
         self.dim = dim
         if not pre:
@@ -240,7 +241,7 @@ class Fast_text_TF_IDF_IR:
 
     def process_q(self,q : np.array , expansion = False) -> List[Tuple]:
         without_expansion = sorted([(key,np.abs(distance.cosine(q,self.doc_emb[key]))) for key in self.doc_emb],key = lambda x : x[1])
-        if not expansion : 
+        if not expansion :
             return without_expansion
         near = without_expansion[:10]
         far = without_expansion[-10:]
@@ -253,8 +254,7 @@ class Fast_text_TF_IDF_IR:
         c = self.c_soft(np.array([self.idf.get(self.mapping.get(w,0),0) for w in word if self.is_c_(w)]).reshape(1,-1))
         q = np.matmul(c,matrix)[0]
         article_id = self.process_q(q , expansion)[k[0]:k[1]]
-        articles = [self.documents[id[0]] for id in article_id]
-        return (article_id,articles)
+        return article_id
 
 source = "./"
 f_source = lambda s : source+"/"+s
@@ -264,7 +264,7 @@ class Transformer:
     self.model = SentenceTransformer(model_name)
     self.documents = docs
     self.representation = None
-  
+
   def preprocess(self,pre_use = False):
     if not pre_use:
       docs = []
@@ -294,9 +294,9 @@ class Transformer:
         return (article_id,article)
     near = without_expansion[:10]
     far = without_expansion[-10:]
-    q = 0.6 * q + 0.5 * np.mean([self.representation[a[0]]for a in near]) - 0.1 * np.mean([self.representation[a[0]]for a in far])
+    q = 0.6 * q + 0.5 * np.mean([self.representation[a[0]]for a in near],axis = 0) - 0.1 * np.mean([self.representation[a[0]]for a in far],axis = 0)
     return sorted([(key,np.abs(distance.cosine(q,self.representation[key]))) for key in self.representation],key = lambda x : x[1])[k[0]:k[1]]
-        
+
 
 class Page_Ranking_Hits:
     def __init__(self):
@@ -306,33 +306,34 @@ class Page_Ranking_Hits:
         self.objective = self.articles if objective == "article" else self.authors
         representation = json.load(open(f_source("DATA/P5/article_mapping.json"),"r"))
         self.mapping = {int(representation[doc]):doc for doc in representation}
-        
+
     def compute_page_rank(self, alpha = 0.9):
         graph = nx.from_numpy_array(A=self.objective.toarray(), create_using=nx.DiGraph)
         self.pr = nx.pagerank(G=graph, alpha=alpha)
-        
+
     def compute_hits(self):
         graph = nx.from_numpy_array(A=self.objective.toarray(), create_using=nx.DiGraph)
-        self.hub, self.authority = nx.hits(G=graph) 
-        
+        self.hub, self.authority = nx.hits(G=graph)
+
     def tops_pages(self, k = 10):
         res = sorted(self.pr.items(),key = lambda x : x[1] , reverse = True)[:k]
         return [self.mapping[int(ar[0])] for ar in res]
-    
+
     def cal_cites(self):
         return np.asarray(np.sum(self.objective,axis = 0)).reshape(-1)
-    
+
     def top_hubs(self, k = 10):
         return sorted(self.hub.items(),key = lambda x : x[1] , reverse = True)[:k]
-    
+
     def top_auth(self, k = 10):
         return sorted(self.authority.items(),key = lambda x : x[1] , reverse = True)[:k]
-    
+
     def cal_ref(self):
         return np.asarray(np.sum(self.objective,axis = 1)).reshape(-1)
 
 MAIN_DATA_PATH = "../DATA/clean_data.json"
 CLUSTER_DATA_PATH = "../DATA/clustring_data.csv"
+CLASSIFICATION_DATA_PATH = "../DATA/classification_data.csv"
 
 
 class IR:
@@ -372,20 +373,30 @@ class IR:
         self.page_hits_articles.compute_page_rank(0.9)
         self.page_hits_articles.compute_hits()
 
-        ######------------ for hossein
-
+        print("loading classification data ... ")
+        self.classification_model_name  = 'distilbert-base-uncased'
+        self.classification_model = AutoModelForSequenceClassification.from_pretrained("DATA/P4/classification_model", from_tf=True)
+        self.classification_classes = {
+                        'LABEL_0' : 'cs.CV',
+                        'LABEL_1' : 'cs.LG',
+                        'LABEL_2' : 'stat.ML'
+                    }
+        self.classification_class_categories = {v: k for k, v in self.classification_classes.items()}
+        self.classification_tokenizer = AutoTokenizer.from_pretrained(self.classification_model_name)
+        self.classification_pipeline = TextClassificationPipeline(model=self.classification_model, tokenizer=self.classification_tokenizer, return_all_scores=False)
 
         print("Finished loading packages.")
 
 
 
 
-        
-    
+
+
     def classification(self,text):
-        #text class
-        pass
-    
+        prediction = self.classification_pipeline(text)[0]
+        predicted_class = self.classification_classes[prediction['label']]
+        return predicted_class
+
 
 
     def clustring(self,text):
@@ -399,7 +410,7 @@ class IR:
         concated_data_bert = np.array([np.array([abstract_bert[i],titles_bert[i]]).reshape(-1) for i in range((abstract_bert.shape[0]))])
         return self.cluster_labels_map[self.kmeas_map_label[self.cluster_model.predict(concated_data_bert)[0]]]
 
-    
+
     def search(self,text,type_text,query_expansion = False,mode = "bert" , range_q = (0,40)):# abstract title author
         #mode = bert , tf-idf , fasttext , boolean
         #text_type = abstract , title , author
@@ -418,14 +429,10 @@ class IR:
             if type_text == "author":
                 qt = Query_type.AUTHOR
             return self.boolean_ir.query(qt,text,range_q)
-    
+
     def best_articles(self,k = 10):# page_rank,hits
         return self.page_hits_articles.tops_pages(k = 10)
-        #self.page_hits_articles.
-        
+        #self.page_hits_articles.s
         # type_query = page_rank , hits ,
         # k = numbers
-        # mode = artcile , author 
-
-        pass
-# ir = IR()
+        # mode = artcile , author
