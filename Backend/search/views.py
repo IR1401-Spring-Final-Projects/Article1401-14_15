@@ -1,19 +1,15 @@
-from django.shortcuts import render
+import os
+import sys
+
 from django.http import JsonResponse
-from django.shortcuts import render, get_object_or_404, redirect
-from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 from elasticsearch import Elasticsearch
 
-import sys
-import os
-
 path = os.getcwd()
-path = path[:path.rfind('/')+1]
+path = path[:path.rfind('/') + 1]
 path += 'Information_Retrieval/'
 sys.path.insert(1, path)
 import mir
-
 
 ir = mir.IR()
 client = Elasticsearch(hosts="http://127.0.0.1:9200")
