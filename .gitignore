@@ -110,3 +110,5 @@ media/
 
 .idea/
 public/Information_Retrieval/DATA/sentence-transformers_all-MiniLM-L12-v2/
+Information_Retrieval/DATA/P4/classification_model/
+Information_Retrieval/DATA/sentence-transformers_all-MiniLM-L12-v2/
