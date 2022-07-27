@@ -114,7 +114,8 @@ for enhancement I used LDA (Linear Discriminative Analysis) for processing and t
 ## Classification
 for P4 we developed 2 methods for this purpose; 1. Logistic Regression, 2. transformers (distilbert-case-uncased).
 for method 1 we were using tf-idf vectors which need all of the train data to build a vector for the test; so we should wait for several minutes to classify only 1 document and so on. 
-thus here we use the transformer model that was trained in P4; keep in mind that we increased the f1-score of the model by training it for 5 epochs.
+
+thus here we use the transformer model; keep in mind that we increased the f1-score of the model (5%) by training it for 5 epochs.
 
 ## Page_Ranking 
 nothing changed so just review previous report on P5
