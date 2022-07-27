@@ -121,6 +121,8 @@ nothing changed so just review previous report on P5
 
 we coordinated with our assigned TA mr. Balapour that this type of query is meaningful only for fasttext and transformer model and we apply this for our project only on fasttext and transformer.
 
++ new MRR evaluation is [here](https://docs.google.com/spreadsheets/d/1nCTclSdeqru7yEWLc08N9R3LVM8jNt5xn7AW0u_NJhk/edit?usp=sharing)
+
 here is the code:
 
 ```py
